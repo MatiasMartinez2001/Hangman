@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ta-Te-Ti Avanzado</title>
+<style>
+body { font-family: "Poppins", sans-serif; background: radial-gradient(circle at top left, #6a11cb, #2575fc); color: #fff; text-align: center; height: 100vh; margin:0; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+h1 { margin-bottom:10px; text-shadow: 2px 2px 6px rgba(0,0,0,0.3); }
+.mode-select { margin-bottom: 15px; }
+select { padding: 8px 12px; border-radius: 8px; border: none; font-size:1rem; }
+.scoreboard { display:flex; justify-content:center; gap:40px; margin-bottom:15px; font-size:1.2rem; }
+.score { background: rgba(255,255,255,0.15); border-radius:10px; padding:10px 20px; box-shadow:0 2px 8px rgba(0,0,0,0.2); }
+.x-score { color:#00c3ff; text-shadow:0 0 6px #00c3ff; }
+.o-score { color:#ff3b3b; text-shadow:0 0 6px #ff3b3b; }
+.board { display:grid; grid-template-columns:repeat(3,120px); grid-template-rows:repeat(3,120px); gap:10px; margin:20px 0; }
+.cell { background-color: rgba(255,255,255,0.1); border:2px solid #fff; border-radius:12px; font-size:3rem; font-weight:bold; display:flex; justify-content:center; align-items:center; cursor:pointer; transition: all 0.25s ease; }
+.cell:hover { background-color: rgba(255,255,255,0.25); transform: scale(1.05); }
+.cell.x { color:#00c3ff; text-shadow:0 0 10px #00c3ff; }
+.cell.o { color:#ff3b3b; text-shadow:0 0 10px #ff3b3b; }
+.status { font-size:1.3rem; margin-bottom:15px; font-weight:500; }
+.button { background-color:#fff; color:#2575fc; border:none; border-radius:8px; padding:12px 24px; font-size:1rem; cursor:pointer; transition: all 0.3s; box-shadow:0 4px 8px rgba(0,0,0,0.2); }
+.button:hover { background-color:#dfe4ff; transform: scale(1.05); }
+</style>
+</head>
+<body>
+
+<h1>🎯 Ta-Te-Ti Avanzado</h1>
+
+<div class="mode-select">
+<label for="mode">Modo de juego:</label>
+<select id="mode">
+<option value="player">Jugador vs Jugador</option>
+<option value="cpu">Jugador vs CPU</option>
+</select>
+</div>
+
+<div class="scoreboard">
+<div class="score x-score">Jugador X: <span id="xWins">0</span></div>
+<div class="score o-score">Jugador O: <span id="oWins">0</span></div>
+</div>
+
+<div class="status" id="status">Turno de: <span id="turn-color" style="color:#00c3ff;">X</span></div>
+<div class="board" id="board"></div>
+<button class="button" id="reset">Reiniciar partida</button>
+
+<script>
+const board = document.getElementById("board");
+const statusText = document.getElementById("status");
+const turnColor = document.getElementById("turn-color");
+const resetButton = document.getElementById("reset");
+const modeSelect = document.getElementById("mode");
+const xWinsDisplay = document.getElementById("xWins");
+const oWinsDisplay = document.getElementById("oWins");
+
+let currentPlayer = "X";
+let gameActive = true;
+let gameState = ["","","","","","","","",""];
+let xWins = 0;
+let oWins = 0;
+let mode = "player";
+let selectedCell = null;
+
+const winningConditions = [
+[0,1,2],[3,4,5],[6,7,8],
+[0,3,6],[1,4,7],[2,5,8],
+[0,4,8],[2,4,6],
+];
+
+modeSelect.addEventListener("change",(e)=>{ mode=e.target.value; resetGame(); });
+
+function createBoard(){
+    board.innerHTML="";
+    gameState.forEach((_,i)=>{
+        const cell=document.createElement("div");
+        cell.classList.add("cell");
+        cell.dataset.index=i;
+        cell.addEventListener("click", handleCellClick);
+        board.appendChild(cell);
+    });
+}
+
+function handleCellClick(e){
+    const index = e.target.dataset.index;
+
+    if(!gameActive){
+        // Permitir mover piezas tras empate
+        if(gameState[index]!==""){
+            selectedCell=index;
+            board.children[index].style.border="2px dashed yellow";
+        } else if(selectedCell!==null){
+            const movingPlayer=gameState[selectedCell];
+            gameState[selectedCell]="";
+            const oldCell=board.children[selectedCell];
+            oldCell.textContent="";
+            oldCell.classList.remove("x","o");
+            oldCell.style.border="2px solid #fff";
+
+            gameState[index]=movingPlayer;
+            const newCell=board.children[index];
+            newCell.textContent=movingPlayer;
+            newCell.classList.add(movingPlayer.toLowerCase());
+            selectedCell=null;
+        }
+        return;
+    }
+
+    if(gameState[index]!=="") return;
+
+    makeMove(index,currentPlayer);
+    if(checkGameEnd()) return;
+
+    if(mode==="cpu" && currentPlayer==="O" && gameActive){
+        setTimeout(cpuMove,500);
+    }
+}
+
+function makeMove(index,player){
+    gameState[index]=player;
+    const cell=board.children[index];
+    cell.textContent=player;
+    cell.classList.add(player.toLowerCase());
+}
+
+function cpuMove(){
+    let move=findBestMove();
+    makeMove(move,"O");
+    checkGameEnd();
+}
+
+function findBestMove(){
+    for(let [a,b,c] of winningConditions){
+        if(gameState[a]==="O" && gameState[b]==="O" && gameState[c]==="") return c;
+        if(gameState[a]==="O" && gameState[c]==="O" && gameState[b]==="") return b;
+        if(gameState[b]==="O" && gameState[c]==="O" && gameState[a]==="") return a;
+    }
+    for(let [a,b,c] of winningConditions){
+        if(gameState[a]==="X" && gameState[b]==="X" && gameState[c]==="") return c;
+        if(gameState[a]==="X" && gameState[c]==="X" && gameState[b]==="") return b;
+        if(gameState[b]==="X" && gameState[c]==="X" && gameState[a]==="") return a;
+    }
+    const available=gameState.map((v,i)=>v===""?i:null).filter(v=>v!==null);
+    return available[Math.floor(Math.random()*available.length)];
+}
+
+function checkGameEnd(){
+    if(checkWin()){
+        statusText.innerHTML=`🎉 ¡Jugador <span style="color:${currentPlayer==="X"?"#00c3ff":"#ff3b3b"};">${currentPlayer}</span> gana!`;
+        gameActive=false;
+        updateScore(currentPlayer);
+        return true;
+    }
+    if(!gameState.includes("")){
+        statusText.textContent="😐 Empate: puedes mover piezas";
+        gameActive=false;
+        return true;
+    }
+
+    currentPlayer=currentPlayer==="X"?"O":"X";
+    const color=currentPlayer==="X"?"#00c3ff":"#ff3b3b";
+    turnColor.style.color=color;
+    turnColor.textContent=currentPlayer;
+    statusText.innerHTML=`Turno de: <span id="turn-color" style="color:${color};">${currentPlayer}</span>`;
+    return false;
+}
+
+function checkWin(){
+    return winningConditions.some(([a,b,c])=>{
+        return gameState[a] && gameState[a]===gameState[b] && gameState[a]===gameState[c];
+    });
+}
+
+function updateScore(winner){
+    if(winner==="X"){ xWins++; xWinsDisplay.textContent=xWins; }
+    else { oWins++; oWinsDisplay.textContent=oWins; }
+}
+
+function resetGame(){
+    gameState=["","","","","","","","",""];
+    currentPlayer="X";
+    gameActive=true;
+    selectedCell=null;
+    turnColor.style.color="#00c3ff";
+    turnColor.textContent="X";
+    statusText.innerHTML=`Turno de: <span id="turn-color" style="color:#00c3ff;">X</span>`;
+    createBoard();
+}
+
+resetButton.addEventListener("click", resetGame);
+createBoard();
+</script>
+
+</body>
+</html>
